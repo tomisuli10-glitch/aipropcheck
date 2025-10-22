@@ -2,11 +2,188 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AI PropCheck</title>
+    <!-- Tailwind vía CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React 18 y ReactDOM vía CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   </head>
-  <body>
+  <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+
+    <script>
+      // === MOCK de datos (igual que el que viste) ===
+      const MOCK_ANALYSIS = {
+        address: "Palermo Soho",
+        summary: { rooms: 2, sqm: 52, floor: 9, parking: true },
+        publishedPrice: 180000,
+        estimate: [158000, 166000],
+        deltaText: "10–15% por encima del promedio de la zona",
+        comparables: [
+          { id: 1, title: "Honduras 4700", sqm: 54, price: 163000, url: "#" },
+          { id: 2, title: "Cabrera 4800", sqm: 50, price: 159000, url: "#" },
+          { id: 3, title: "Gorriti 4600", sqm: 53, price: 161000, url: "#" },
+        ],
+        explanation:
+          "Tu propiedad está 10–15% por encima del promedio en Palermo Soho. La diferencia podría explicarse por el piso alto y amenities del edificio.",
+        recommendation: { text: "Negociá un 8–12% respecto del precio publicado.", confidence: 0.73 },
+      };
+
+      const e = React.createElement;
+
+      function Header() {
+        return e("header", { className: "sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur" },
+          e("div", { className: "mx-auto flex max-w-6xl items-center justify-between px-4 py-3" },
+            e("div", { className: "flex items-center gap-2" },
+              e("div", { className: "grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white" }, "🏠"),
+              e("span", { className: "text-lg font-semibold" }, "AI PropCheck")
+            ),
+            e("nav", { className: "hidden gap-6 md:flex" },
+              e("a", { className: "text-sm text-slate-600 hover:text-slate-900", href: "#como" }, "Cómo funciona"),
+              e("a", { className: "text-sm text-slate-600 hover:text-slate-900", href: "#precios" }, "Precios"),
+              e("a", { className: "text-sm text-slate-600 hover:text-slate-900", href: "#ingresar" }, "Ingresar"),
+            )
+          )
+        );
+      }
+
+      function Stat({ label, value, highlight }) {
+        return e("div", { className: `rounded-xl border p-4 ${highlight ? "border-blue-200 bg-blue-50" : "border-slate-200 bg-white"}` },
+          e("p", { className: "text-xs uppercase tracking-wide text-slate-500" }, label),
+          e("p", { className: `mt-1 text-lg font-semibold ${highlight ? "text-blue-700" : "text-slate-900"}` }, value)
+        );
+      }
+
+      function PlanCard({ title, price, features, badge }) {
+        return e("div", { className: "rounded-2xl border border-slate-200 p-5" },
+          e("div", { className: "mb-2 flex items-center justify-between" },
+            e("h4", { className: "text-base font-semibold" }, title),
+            badge && e("span", { className: "rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white" }, badge)
+          ),
+          e("p", { className: "text-xl font-semibold" }, price),
+          e("ul", { className: "mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700" },
+            ...features.map((f, i) => e("li", { key: i }, f))
+          ),
+          e("button", { className: "mt-4 w-full rounded-xl border border-slate-300 bg-white py-2 text-sm hover:bg-slate-50" }, "Elegir")
+        );
+      }
+
+      function App() {
+        const [url, setUrl] = React.useState("");
+        const [view, setView] = React.useState("home");
+        const [report, setReport] = React.useState(null);
+
+        function analyze() {
+          if (!url.trim()) return;
+          setView("loading");
+          setTimeout(() => {
+            setReport(MOCK_ANALYSIS);
+            setView("result");
+          }, 700);
+        }
+
+        return e(React.Fragment, null,
+          e(Header),
+          e("main", { className: "mx-auto max-w-6xl px-4 pb-24" },
+            view === "home" && e("section", { className: "py-14" },
+              e("div", { className: "mx-auto grid max-w-3xl gap-8 text-center" },
+                e("h1", { className: "text-4xl font-bold leading-tight md:text-5xl" }, "¿Cuánto vale realmente tu propiedad?"),
+                e("p", { className: "text-lg text-slate-600" }, "Pegá el link de tu publicación (Zonaprop, Argenprop o Mercado Libre) y obtené gratis tu análisis inteligente."),
+                e("div", { className: "flex flex-col items-center gap-3 md:flex-row" },
+                  e("input", {
+                    value: url,
+                    onChange: (ev) => setUrl(ev.target.value),
+                    placeholder: "https://www.zonaprop.com.ar/...",
+                    className: "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 md:w-[70%]"
+                  }),
+                  e("button", { onClick: analyze, className: "w-full rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow md:w-auto" }, "Analizar")
+                ),
+                e("p", { className: "text-sm text-slate-500" }, "Incluye ", e("span", { className: "font-semibold" }, "2 análisis gratis"), " por mes. Sin tarjetas, sin compromiso."),
+                e("div", { id: "como", className: "mt-10 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 md:grid-cols-3" },
+                  ["Pegá el link", "Buscamos comparables", "Te damos un rango + PDF"].map((t, i) =>
+                    e("div", { key: i, className: "rounded-xl border border-slate-100 p-4" },
+                      e("div", { className: "mb-2 text-2xl" }, i === 0 ? "🔗" : i === 1 ? "🧭" : "📄"),
+                      e("p", { className: "font-medium" }, t)
+                    )
+                  )
+                )
+              )
+            ),
+            view === "loading" && e("section", { className: "grid place-items-center py-24" },
+              e("div", { className: "grid max-w-md gap-4 text-center" },
+                e("div", { className: "mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-300 border-t-blue-600" }),
+                e("p", { className: "text-slate-600" }, "Buscando comparables en tu zona… Puede tardar unos segundos.")
+              )
+            ),
+            view === "result" && report && e("section", { className: "py-10" },
+              e("div", { className: "mb-6 flex items-center justify-between" },
+                e("button", { onClick: () => setView("home"), className: "text-sm text-blue-600 hover:underline" }, "← Volver"),
+                e("div", { className: "flex items-center gap-2 text-sm text-slate-600" }, "Versión Argentina • Beta")
+              ),
+              e("div", { className: "grid gap-6 md:grid-cols-3" },
+                e("div", { className: "md:col-span-2 grid gap-6" },
+                  e("div", { className: "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" },
+                    e("h2", { className: "text-xl font-semibold" }, report.address),
+                    e("p", { className: "mt-1 text-slate-600" },
+                      `${report.summary.rooms} ambientes — ${report.summary.sqm} m² — ${report.summary.floor}° piso — ${report.summary.parking ? "cochera" : "sin cochera"}`
+                    ),
+                    e("div", { className: "mt-4 grid gap-3 md:grid-cols-3" },
+                      e(Stat, { label: "Precio publicado", value: `US$ ${report.publishedPrice.toLocaleString()}` }),
+                      e(Stat, { label: "Valor estimado AI PropCheck", value: `US$ ${report.estimate[0].toLocaleString()} – ${report.estimate[1].toLocaleString()}`, highlight: true }),
+                      e(Stat, { label: "Diferencia vs. zona", value: report.deltaText })
+                    ),
+                    e("p", { className: "mt-4 text-slate-700" }, report.explanation),
+                    e("div", { className: "mt-4 rounded-xl bg-slate-50 p-4 text-slate-700" },
+                      e("span", { className: "font-medium" }, "Recomendación: "),
+                      `${report.recommendation.text} `,
+                      e("span", { className: "text-slate-500" }, `(confianza ${Math.round(report.recommendation.confidence * 100)}%)`)
+                    ),
+                    e("div", { className: "mt-6 flex flex-wrap gap-3" },
+                      e("button", { className: "rounded-xl border border-slate-300 bg-white px-4 py-2" }, "Compartir por WhatsApp"),
+                      e("button", { className: "rounded-xl bg-blue-600 px-4 py-2 font-medium text-white" }, "Descargar informe PDF")
+                    )
+                  ),
+                  e("div", { className: "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" },
+                    e("h3", { className: "mb-3 text-lg font-semibold" }, "Comparables cercanos"),
+                    e("ul", { className: "grid gap-3 md:grid-cols-3" },
+                      ...report.comparables.map(c =>
+                        e("li", { key: c.id, className: "rounded-xl border border-slate-200 p-4" },
+                          e("p", { className: "font-medium" }, c.title),
+                          e("p", { className: "text-sm text-slate-600" }, `${c.sqm} m²`),
+                          e("p", { className: "text-sm" }, `US$ ${c.price.toLocaleString()}`),
+                          e("a", { href: c.url, className: "text-sm text-blue-600 hover:underline" }, "Ver aviso")
+                        )
+                      )
+                    )
+                  )
+                ),
+                e("div", { className: "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" },
+                  e("h3", { className: "mb-3 text-lg font-semibold" }, "Mapa (1 km a la redonda)"),
+                  e("div", { className: "grid h-64 place-items-center rounded-xl border border-dashed border-slate-300" },
+                    e("div", { className: "text-slate-500" }, "🗺️ Mapa de Palermo (mock)")
+                  ),
+                  e("div", { className: "mt-4 grid gap-2 text-sm text-slate-600" },
+                    e("p", null, "Zona: Palermo Soho"),
+                    e("p", null, "Radio: 1 km")
+                  )
+                )
+              ),
+              e("div", { id: "precios", className: "mt-12 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" },
+                e("h3", { className: "mb-4 text-lg font-semibold" }, "Planes"),
+                e("div", { className: "grid gap-4 md:grid-cols-3" },
+                  e(PlanCard, { title: "Free", price: "$0", features: ["2 análisis/mes", "Resultados en la web"] }),
+                  e(PlanCard, { title: "Pro", price: "US$ 4.99/mes", badge: "Recomendado", features: ["20 análisis/mes", "Descarga de PDFs", "Soporte prioritario"] }),
+                  e(PlanCard, { title: "Inmobiliarias", price: "US$ 39/mes", features: ["100 análisis/mes", "Branding en PDFs", "Multiusuario"] })
+                )
+              )
+            )
+          )
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+    </script>
   </body>
 </html>
