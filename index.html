@@ -3,10 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI PropCheck — Comprador</title>
-    <!-- Tailwind vía CDN -->
+    <title>AI PropCheck — Estimá la propiedad que querés comprar</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React 18 y ReactDOM vía CDN -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   </head>
@@ -14,168 +12,322 @@
     <div id="root"></div>
 
     <script>
-      const MOCK_ANALYSIS = {
-        address: "Palermo Soho",
-        summary: { rooms: 2, sqm: 52, floor: 9, parking: true },
-        publishedPrice: 180000,
-        estimate: [158000, 166000],
-        deltaText: "10–15% por encima del promedio de la zona",
-        comparables: [
-          { id: 1, title: "Honduras 4700", sqm: 54, price: 163000, url: "#" },
-          { id: 2, title: "Cabrera 4800", sqm: 50, price: 159000, url: "#" },
-          { id: 3, title: "Gorriti 4600", sqm: 53, price: 161000, url: "#" },
-        ],
-        explanation:
-          "La propiedad está 10–15% por encima del promedio en Palermo Soho. La diferencia puede deberse al piso alto y amenities del edificio.",
-        recommendation: { text: "Negociá un 8–12% respecto del precio publicado.", confidence: 0.73 },
-      };
-
       const e = React.createElement;
 
       function Header() {
-        return e("header", { className: "sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur" },
-          e("div", { className: "mx-auto flex max-w-6xl items-center justify-between px-4 py-3" },
-            e("div", { className: "flex items-center gap-2" },
-              e("div", { className: "grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white" }, "🏠"),
-              e("span", { className: "text-lg font-semibold" }, "AI PropCheck")
+        return e("header",{className:"sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur"},
+          e("div",{className:"mx-auto flex max-w-6xl items-center justify-between px-4 py-3"},
+            e("div",{className:"flex items-center gap-2"},
+              e("div",{className:"grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white"},"🏠"),
+              e("span",{className:"text-lg font-semibold"},"AI PropCheck")
             ),
-            e("nav", { className: "hidden gap-6 md:flex" },
-              e("a", { className: "text-sm text-slate-600 hover:text-slate-900", href: "#como" }, "Cómo funciona"),
-              e("a", { className: "text-sm text-slate-600 hover:text-slate-900", href: "#precios" }, "Precios"),
-              e("a", { className: "text-sm text-slate-600 hover:text-slate-900", href: "#ingresar" }, "Ingresar"),
+            e("nav",{className:"hidden gap-6 md:flex"},
+              e("a",{className:"text-sm text-slate-600 hover:text-slate-900",href:"#como"},"Cómo funciona"),
+              e("a",{className:"text-sm text-slate-600 hover:text-slate-900",href:"#precios"},"Precios")
             )
           )
-        );
+        )
       }
 
       function Stat({ label, value, highlight }) {
-        return e("div", { className: `rounded-xl border p-4 ${highlight ? "border-blue-200 bg-blue-50" : "border-slate-200 bg-white"}` },
-          e("p", { className: "text-xs uppercase tracking-wide text-slate-500" }, label),
-          e("p", { className: `mt-1 text-lg font-semibold ${highlight ? "text-blue-700" : "text-slate-900"}` }, value)
+        return e("div",{className:`rounded-xl border p-4 ${highlight?"border-blue-200 bg-blue-50":"border-slate-200 bg-white"}`},
+          e("p",{className:"text-xs uppercase tracking-wide text-slate-500"},label),
+          e("p",{className:`mt-1 text-lg font-semibold ${highlight?"text-blue-700":"text-slate-900"}`},value)
         );
       }
 
-      function PlanCard({ title, price, features, badge }) {
-        return e("div", { className: "rounded-2xl border border-slate-200 p-5" },
-          e("div", { className: "mb-2 flex items-center justify-between" },
-            e("h4", { className: "text-base font-semibold" }, title),
-            badge && e("span", { className: "rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white" }, badge)
-          ),
-          e("p", { className: "text-xl font-semibold" }, price),
-          e("ul", { className: "mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700" },
-            ...features.map((f, i) => e("li", { key: i }, f))
-          ),
-          e("button", { className: "mt-4 w-full rounded-xl border border-slate-300 bg-white py-2 text-sm hover:bg-slate-50" }, "Elegir")
-        );
-      }
+      const INITIAL_FORM = {
+        calle: "", altura: "", barrio: "",
+        piso: "", dpto: "",
+        ambientes: "2", m2: "", antiguedad: "0-10",
+        cochera: false, seguridad: false,
+        amenities: { pileta:false, gym:false, sum:false, parrilla:false },
+        estado: "bueno", orientacion: "N",
+      };
 
-      function App() {
-        const [url, setUrl] = React.useState("");
-        const [view, setView] = React.useState("home");
-        const [report, setReport] = React.useState(null);
+      function App(){
+        const [view,setView]=React.useState("home");
+        const [form,setForm]=React.useState(INITIAL_FORM);
+        const [report,setReport]=React.useState(null);
+        const [errors,setErrors]=React.useState({});
 
-        function analyze() {
-          if (!url.trim()) return;
-          setView("loading");
-          setTimeout(() => {
-            setReport(MOCK_ANALYSIS);
-            setView("result");
-          }, 700);
+        function setField(name, value){
+          setForm(prev=>({...prev,[name]:value}));
+        }
+        function setAmenity(key, value){
+          setForm(prev=>({...prev, amenities:{...prev.amenities,[key]:value}}));
         }
 
-        return e(React.Fragment, null,
+        function validate(){
+          const err={};
+          if(!form.barrio.trim()) err.barrio="Elegí un barrio";
+          if(!form.calle.trim()) err.calle="Ingresá la calle";
+          if(!form.altura.trim() || isNaN(Number(form.altura))) err.altura="Altura inválida";
+          if(!form.m2.trim() || isNaN(Number(form.m2)) || Number(form.m2)<15) err.m2="m² inválidos";
+          return err;
+        }
+
+        async function calcular(){
+          const err=validate();
+          setErrors(err);
+          if(Object.keys(err).length) return;
+
+          setView("loading");
+
+          // 🔧 MOCK de resultado (hasta conectar a Xano POST /estimate)
+          setTimeout(()=>{
+            const baseMediana = 160000;
+            const m2 = Number(form.m2);
+            const amb = Number(form.ambientes);
+            const ajusteM2 = (m2-50)*1200;         // ajuste lineal simple por tamaño
+            const ajusteAmb = (amb-2)*8000;        // más ambientes, +$
+            const extras = (form.cochera?9000:0) + (form.seguridad?6000:0)
+              + (form.amenities.pileta?5000:0) + (form.amenities.gym?3000:0)
+              + (form.amenities.sum?2000:0) + (form.amenities.parrilla?1500:0);
+            const antig = form.antiguedad==="0-10"?4000:form.antiguedad==="10-30"?0:-5000;
+            const pisoAdj = Number(form.piso||"0")>=8?5000:0;
+
+            const median = Math.max(60000, baseMediana + ajusteM2 + ajusteAmb + extras + antig + pisoAdj);
+            const q1 = Math.round(median*0.93);
+            const q3 = Math.round(median*1.05);
+
+            setReport({
+              address:`${form.calle} ${form.altura}, ${form.barrio}`,
+              summary:{rooms: amb, sqm: m2, floor: Number(form.piso||"0"), parking: form.cochera},
+              estimate:[q1,q3],
+              publishedPrice:null,
+              deltaText:`Rango estimado según comparables similares`,
+              comparables:[
+                {id:1,title:`${form.barrio} (±10% m²)`,sqm: Math.round(m2*0.95), price: q1, url:"#"},
+                {id:2,title:`${form.barrio} (mediana)`,sqm: m2, price: median, url:"#"},
+                {id:3,title:`${form.barrio} (top 25%)`,sqm: Math.round(m2*1.05), price: q3, url:"#"},
+              ],
+              explanation:`Estimación basada en tamaño, ambientes y extras (cochera/seguridad/amenities), comparada con publicaciones similares del barrio.`,
+              recommendation:{ text:"Usá este rango como base y apuntá a cerrar 5–10% por debajo del precio listado.", confidence:0.72 }
+            });
+            setView("result");
+          },700);
+        }
+
+        function Field({label, error, children}){
+          return e("div",null,
+            e("label",{className:"mb-1 block text-sm font-medium text-slate-700"},label),
+            children,
+            error && e("p",{className:"mt-1 text-sm text-red-600"},error)
+          );
+        }
+
+        return e(React.Fragment,null,
           e(Header),
-          e("main", { className: "mx-auto max-w-6xl px-4 pb-24" },
-            view === "home" && e("section", { className: "py-14" },
-              e("div", { className: "mx-auto grid max-w-3xl gap-8 text-center" },
-                e("h1", { className: "text-4xl font-bold leading-tight md:text-5xl" }, "¿Cuánto vale realmente la propiedad que vas a comprar?"),
-                e("p", { className: "text-lg text-slate-600" }, "Pegá el link del aviso (Zonaprop, Argenprop o Mercado Libre) y descubrí si el precio está por encima o por debajo del promedio de la zona."),
-                e("div", { className: "flex flex-col items-center gap-3 md:flex-row" },
-                  e("input", {
-                    value: url,
-                    onChange: (ev) => setUrl(ev.target.value),
-                    placeholder: "https://www.zonaprop.com.ar/...",
-                    className: "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 md:w-[70%]"
-                  }),
-                  e("button", { onClick: analyze, className: "w-full rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow md:w-auto" }, "Analizar propiedad")
+          e("main",{className:"mx-auto max-w-6xl px-4 pb-24"},
+            view==="home" && e("section",{className:"py-10"},
+              e("div",{className:"mx-auto grid max-w-4xl gap-8"},
+                e("div",{className:"text-center"},
+                  e("h1",{className:"text-4xl font-bold leading-tight md:text-5xl"},
+                    "¿Cuánto debería valer la propiedad que querés comprar?"
+                  ),
+                  e("p",{className:"mt-2 text-lg text-slate-600"},
+                    "Ingresá los datos clave y te damos un rango de precio estimado con comparables reales de la zona."
+                  )
                 ),
-                e("p", { className: "text-sm text-slate-500" }, "Incluye ", e("span", { className: "font-semibold" }, "2 análisis gratis"), " por mes. Sin tarjetas, sin compromiso."),
-                e("p", { className: "text-sm text-slate-500" }, "Datos de mercado actualizados cada 24 h usando fuentes públicas y comparables reales."),
-                e("div", { id: "como", className: "mt-10 grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 md:grid-cols-3" },
-                  ["Pegá el link del aviso", "Buscamos comparables", "Te damos un rango + PDF"].map((t, i) =>
-                    e("div", { key: i, className: "rounded-xl border border-slate-100 p-4" },
-                      e("div", { className: "mb-2 text-2xl" }, i === 0 ? "🔗" : i === 1 ? "🧭" : "📄"),
-                      e("p", { className: "font-medium" }, t)
+                e("div",{className:"rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"},
+                  e("div",{className:"grid gap-4 md:grid-cols-3"},
+                    e(Field,{label:"Barrio", error:errors.barrio},
+                      e("select",{value:form.barrio,onChange:ev=>setField("barrio",ev.target.value),
+                        className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"},
+                        e("option",{value:""},"Elegí un barrio"),
+                        ["Palermo","Belgrano","Caballito","Recoleta","Almagro","Nuñez","Villa Urquiza"]
+                          .map(b=>e("option",{key:b,value:b},b))
+                      )
+                    ),
+                    e(Field,{label:"Calle", error:errors.calle},
+                      e("input",{value:form.calle,onChange:ev=>setField("calle",ev.target.value),
+                        placeholder:"Ej. Honduras",className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"})
+                    ),
+                    e(Field,{label:"Altura", error:errors.altura},
+                      e("input",{value:form.altura,onChange:ev=>setField("altura",ev.target.value),
+                        placeholder:"Ej. 4700",className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"})
+                    ),
+
+                    e(Field,{label:"Ambientes"},
+                      e("select",{value:form.ambientes,onChange:ev=>setField("ambientes",ev.target.value),
+                        className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"},
+                        ["1","2","3","4","5"].map(a=>e("option",{key:a,value:a},`${a}`))
+                      )
+                    ),
+                    e(Field,{label:"Metros cuadrados", error:errors.m2},
+                      e("input",{value:form.m2,onChange:ev=>setField("m2",ev.target.value),
+                        placeholder:"Ej. 52",className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"})
+                    ),
+                    e(Field,{label:"Piso (opcional)"},
+                      e("input",{value:form.piso,onChange:ev=>setField("piso",ev.target.value),
+                        placeholder:"Ej. 9",className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"})
+                    ),
+
+                    e(Field,{label:"Antigüedad"},
+                      e("select",{value:form.antiguedad,onChange:ev=>setField("antiguedad",ev.target.value),
+                        className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"},
+                        e("option",{value:"0-10"},"0–10 años"),
+                        e("option",{value:"10-30"},"10–30 años"),
+                        e("option",{value:"30+"},"30+ años")
+                      )
+                    ),
+                    e(Field,{label:"Estado"},
+                      e("select",{value:form.estado,onChange:ev=>setField("estado",ev.target.value),
+                        className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"},
+                        ["a refaccionar","bueno","reciclado"].map(s=>e("option",{key:s,value:s},s))
+                      )
+                    ),
+                    e(Field,{label:"Orientación"},
+                      e("select",{value:form.orientacion,onChange:ev=>setField("orientacion",ev.target.value),
+                        className:"w-full rounded-xl border border-slate-300 bg-white px-3 py-2"},
+                        ["N","NE","E","SE","S","SO","O","NO"].map(o=>e("option",{key:o,value:o},o))
+                      )
+                    )
+                  ),
+
+                  e("div",{className:"mt-4 grid gap-3 md:grid-cols-3"},
+                    e("label",{className:"flex items-center gap-2"},
+                      e("input",{type:"checkbox",checked:form.cochera,onChange:ev=>setField("cochera",ev.target.checked)}),
+                      e("span",null,"Cochera")
+                    ),
+                    e("label",{className:"flex items-center gap-2"},
+                      e("input",{type:"checkbox",checked:form.seguridad,onChange:ev=>setField("seguridad",ev.target.checked)}),
+                      e("span",null,"Seguridad 24h")
+                    ),
+                    e("div",{className:"grid grid-cols-2 gap-3 md:grid-cols-4"},
+                      e("label",{className:"flex items-center gap-2"},
+                        e("input",{type:"checkbox",checked:form.amenities.pileta,onChange:ev=>setAmenity("pileta",ev.target.checked)}),
+                        e("span",null,"Pileta")
+                      ),
+                      e("label",{className:"flex items-center gap-2"},
+                        e("input",{type:"checkbox",checked:form.amenities.gym,onChange:ev=>setAmenity("gym",ev.target.checked)}),
+                        e("span",null,"Gym")
+                      ),
+                      e("label",{className:"flex items-center gap-2"},
+                        e("input",{type:"checkbox",checked:form.amenities.sum,onChange:ev=>setAmenity("sum",ev.target.checked)}),
+                        e("span",null,"SUM")
+                      ),
+                      e("label",{className:"flex items-center gap-2"},
+                        e("input",{type:"checkbox",checked:form.amenities.parrilla,onChange:ev=>setAmenity("parrilla",ev.target.checked)}),
+                        e("span",null,"Parrilla")
+                      )
+                    )
+                  ),
+
+                  e("div",{className:"mt-6 flex flex-wrap items-center justify-between gap-3"},
+                    e("p",{className:"text-sm text-slate-500"},
+                      "Incluye ",e("span",{className:"font-semibold"},"2 estimaciones gratis")," por mes. Sin tarjetas."
+                    ),
+                    e("div",{className:"flex gap-3"},
+                      e("button",{onClick:()=>setForm(INITIAL_FORM),
+                        className:"rounded-xl border border-slate-300 bg-white px-4 py-2"}, "Limpiar"),
+                      e("button",{onClick:calcular,
+                        className:"rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow"}, "Calcular estimación")
+                    )
+                  )
+                ),
+
+                e("div",{id:"como",className:"grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 md:grid-cols-3"},
+                  ["Cargás los datos","Buscamos comparables","Te damos un rango + PDF"].map((t,i)=>
+                    e("div",{key:i,className:"rounded-xl border border-slate-100 p-4"},
+                      e("div",{className:"mb-2 text-2xl"}, i===0?"📝":i===1?"🧭":"📄"),
+                      e("p",{className:"font-medium"},t)
                     )
                   )
                 )
               )
             ),
-            view === "loading" && e("section", { className: "grid place-items-center py-24" },
-              e("div", { className: "grid max-w-md gap-4 text-center" },
-                e("div", { className: "mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-300 border-t-blue-600" }),
-                e("p", { className: "text-slate-600" }, "Buscando comparables en tu zona… Puede tardar unos segundos.")
+
+            view==="loading" && e("section",{className:"grid place-items-center py-24"},
+              e("div",{className:"grid max-w-md gap-4 text-center"},
+                e("div",{className:"mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-300 border-t-blue-600"}),
+                e("p",{className:"text-slate-600"},"Armando comparables y rango estimado…")
               )
             ),
-            view === "result" && report && e("section", { className: "py-10" },
-              e("div", { className: "mb-6 flex items-center justify-between" },
-                e("button", { onClick: () => setView("home"), className: "text-sm text-blue-600 hover:underline" }, "← Volver"),
-                e("div", { className: "flex items-center gap-2 text-sm text-slate-600" }, "Versión Argentina • Beta")
+
+            view==="result" && report && e("section",{className:"py-10"},
+              e("div",{className:"mb-6 flex items-center justify-between"},
+                e("button",{onClick:()=>setView("home"),className:"text-sm text-blue-600 hover:underline"},"← Nueva estimación"),
+                e("div",{className:"flex items-center gap-2 text-sm text-slate-600"},"Versión Argentina • Beta")
               ),
-              e("div", { className: "grid gap-6 md:grid-cols-3" },
-                e("div", { className: "md:col-span-2 grid gap-6" },
-                  e("div", { className: "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" },
-                    e("h2", { className: "text-xl font-semibold" }, report.address),
-                    e("p", { className: "mt-1 text-slate-600" },
-                      `${report.summary.rooms} ambientes — ${report.summary.sqm} m² — ${report.summary.floor}° piso — ${report.summary.parking ? "cochera" : "sin cochera"}`
+              e("div",{className:"grid gap-6 md:grid-cols-3"},
+                e("div",{className:"md:col-span-2 grid gap-6"},
+                  e("div",{className:"rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"},
+                    e("h2",{className:"text-xl font-semibold"}, report.address),
+                    e("p",{className:"mt-1 text-slate-600"},
+                      `${report.summary.rooms} ambientes — ${report.summary.sqm} m² — ${report.summary.floor || 0}° piso — ${report.summary.parking?"cochera":"sin cochera"}`
                     ),
-                    e("div", { className: "mt-4 grid gap-3 md:grid-cols-3" },
-                      e(Stat, { label: "Precio publicado", value: `US$ ${report.publishedPrice.toLocaleString()}` }),
-                      e(Stat, { label: "Valor estimado AI PropCheck", value: `US$ ${report.estimate[0].toLocaleString()} – ${report.estimate[1].toLocaleString()}`, highlight: true }),
-                      e(Stat, { label: "Diferencia vs. zona", value: report.deltaText })
+                    e("div",{className:"mt-4 grid gap-3 md:grid-cols-3"},
+                      e(Stat,{label:"Valor estimado (Q1–Q3)", value:`US$ ${report.estimate[0].toLocaleString()} – ${report.estimate[1].toLocaleString()}`, highlight:true}),
+                      e(Stat,{label:"Metodología", value:"Comparables por zona + ajustes"}),
+                      e(Stat,{label:"Estado/Extras", value:"Incidencia incluida"})
                     ),
-                    e("p", { className: "mt-4 text-slate-700" }, report.explanation),
-                    e("div", { className: "mt-4 rounded-xl bg-slate-50 p-4 text-slate-700" },
-                      e("span", { className: "font-medium" }, "Recomendación: "),
-                      `${report.recommendation.text} `,
-                      e("span", { className: "text-slate-500" }, `(confianza ${Math.round(report.recommendation.confidence * 100)}%)`)
+                    e("p",{className:"mt-4 text-slate-700"}, report.explanation),
+                    e("div",{className:"mt-4 rounded-xl bg-slate-50 p-4 text-slate-700"},
+                      e("span",{className:"font-medium"},"Recomendación: "),
+                      report.recommendation.text,
+                      e("span",{className:"text-slate-500"},` (confianza ${Math.round(report.recommendation.confidence*100)}%)`)
                     ),
-                    e("div", { className: "mt-6 flex flex-wrap gap-3" },
-                      e("button", { className: "rounded-xl border border-slate-300 bg-white px-4 py-2" }, "Compartir por WhatsApp"),
-                      e("button", { className: "rounded-xl bg-blue-600 px-4 py-2 font-medium text-white" }, "Descargar informe PDF")
+                    e("div",{className:"mt-6 flex flex-wrap gap-3"},
+                      e("button",{className:"rounded-xl border border-slate-300 bg-white px-4 py-2"},"Compartir por WhatsApp"),
+                      e("button",{className:"rounded-xl bg-blue-600 px-4 py-2 font-medium text-white"},"Descargar informe PDF")
                     )
                   ),
-                  e("div", { className: "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" },
-                    e("h3", { className: "mb-3 text-lg font-semibold" }, "Comparables cercanos"),
-                    e("ul", { className: "grid gap-3 md:grid-cols-3" },
-                      ...report.comparables.map(c =>
-                        e("li", { key: c.id, className: "rounded-xl border border-slate-200 p-4" },
-                          e("p", { className: "font-medium" }, c.title),
-                          e("p", { className: "text-sm text-slate-600" }, `${c.sqm} m²`),
-                          e("p", { className: "text-sm" }, `US$ ${c.price.toLocaleString()}`),
-                          e("a", { href: c.url, className: "text-sm text-blue-600 hover:underline" }, "Ver aviso")
+                  e("div",{className:"rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"},
+                    e("h3",{className:"mb-3 text-lg font-semibold"},"Comparables cercanos"),
+                    e("ul",{className:"grid gap-3 md:grid-cols-3"},
+                      ...report.comparables.map(c=>
+                        e("li",{key:c.id,className:"rounded-xl border border-slate-200 p-4"},
+                          e("p",{className:"font-medium"},c.title),
+                          e("p",{className:"text-sm text-slate-600"},`${c.sqm} m²`),
+                          e("p",{className:"text-sm"},`US$ ${c.price.toLocaleString()}`),
+                          e("a",{href:c.url,className:"text-sm text-blue-600 hover:underline"},"Ver detalle")
                         )
                       )
                     )
                   )
                 ),
-                e("div", { className: "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" },
-                  e("h3", { className: "mb-3 text-lg font-semibold" }, "Mapa (1 km a la redonda)"),
-                  e("div", { className: "grid h-64 place-items-center rounded-xl border border-dashed border-slate-300" },
-                    e("div", { className: "text-slate-500" }, "🗺️ Mapa de Palermo (mock)")
+                e("div",{className:"rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"},
+                  e("h3",{className:"mb-3 text-lg font-semibold"},"Mapa (1 km a la redonda)"),
+                  e("div",{className:"grid h-64 place-items-center rounded-xl border border-dashed border-slate-300"},
+                    e("div",{className:"text-slate-500"},"🗺️ Próximamente: mapa con comparables")
                   ),
-                  e("div", { className: "mt-4 grid gap-2 text-sm text-slate-600" },
-                    e("p", null, "Zona: Palermo Soho"),
-                    e("p", null, "Radio: 1 km")
+                  e("div",{className:"mt-4 grid gap-2 text-sm text-slate-600"},
+                    e("p",null,`Zona: ${form.barrio||"—"}`),
+                    e("p",null,"Radio: 1 km")
                   )
                 )
               ),
-              e("div", { id: "precios", className: "mt-12 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" },
-                e("h3", { className: "mb-4 text-lg font-semibold" }, "Planes"),
-                e("div", { className: "grid gap-4 md:grid-cols-3" },
-                  e(PlanCard, { title: "Free", price: "$0", features: ["2 análisis/mes", "Resultados en la web"] }),
-                  e(PlanCard, { title: "Pro", price: "US$ 4.99/mes", badge: "Recomendado", features: ["20 análisis/mes", "Descarga de PDFs", "Soporte prioritario"] }),
-                  e(PlanCard, { title: "Inmobiliarias", price: "US$ 39/mes", features: ["100 análisis/mes", "Branding en PDFs", "Multiusuario"] })
+              e("div",{id:"precios",className:"mt-12 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"},
+                e("h3",{className:"mb-4 text-lg font-semibold"},"Planes"),
+                e("div",{className:"grid gap-4 md:grid-cols-3"},
+                  e("div",{className:"rounded-2xl border border-slate-200 p-5"},
+                    e("h4",{className:"mb-1 text-base font-semibold"},"Free"),
+                    e("p",{className:"text-xl font-semibold"},"$0"),
+                    e("ul",{className:"mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700"},
+                      e("li",null,"2 estimaciones/mes"),
+                      e("li",null,"Resultados en la web")
+                    )
+                  ),
+                  e("div",{className:"rounded-2xl border border-slate-200 p-5"},
+                    e("h4",{className:"mb-1 text-base font-semibold"},"Pro"),
+                    e("p",{className:"text-xl font-semibold"},"US$ 4.99/mes"),
+                    e("ul",{className:"mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700"},
+                      e("li",null,"20 estimaciones/mes"),
+                      e("li",null,"Descarga de PDFs"),
+                      e("li",null,"Soporte prioritario")
+                    )
+                  ),
+                  e("div",{className:"rounded-2xl border border-slate-200 p-5"},
+                    e("h4",{className:"mb-1 text-base font-semibold"},"Inmobiliarias"),
+                    e("p",{className:"text-xl font-semibold"},"US$ 39/mes"),
+                    e("ul",{className:"mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700"},
+                      e("li",null,"100 estimaciones/mes"),
+                      e("li",null,"Branding en PDFs"),
+                      e("li",null,"Multiusuario")
+                    )
+                  )
                 )
               )
             )
